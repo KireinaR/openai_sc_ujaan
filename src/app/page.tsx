@@ -1,69 +1,100 @@
-import Image from "next/image";
+import Link from "next/link";
+import { getDb } from "@/lib/mongodb";
+import { serialize } from "@/lib/serialize";
+import SearchHero from "@/components/SearchHero";
+import ResourceCard from "@/components/ResourceCard";
+import PersonCard from "@/components/PersonCard";
+import type { ResourceWithUploader, UserDoc } from "@/lib/types";
+import { hydrateResources } from "@/lib/hydrate";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const db = await getDb();
+
+  const [userCount, resourceCount, requestCount, topResourceDocs, activePeopleDocs] =
+    await Promise.all([
+      db.collection("users").countDocuments(),
+      db.collection("resources").countDocuments(),
+      db.collection("requests").countDocuments({ status: "open" }),
+      db.collection("resources").find({}).sort({ helpfulCount: -1 }).limit(3).toArray(),
+      db.collection("users").find({}).sort({ _id: -1 }).limit(3).toArray(),
+    ]);
+
+  const topResources = (await hydrateResources(
+    db,
+    serialize(topResourceDocs) as unknown as ResourceWithUploader[]
+  )) as ResourceWithUploader[];
+  const activePeople = serialize(activePeopleDocs) as unknown as UserDoc[];
+
+  const stats = [
+    { label: "Students", value: userCount },
+    { label: "Shared resources", value: resourceCount },
+    { label: "Open requests", value: requestCount },
+  ];
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
+    <div className="page-enter">
+      <section className="px-6 sm:px-8 pt-24 sm:pt-36 pb-24 sm:pb-36">
+        <div className="mx-auto max-w-4xl flex flex-col items-center text-center gap-12">
+          <h1 className="text-[2.3rem] leading-[1.15] sm:text-5xl lg:text-6xl sm:leading-[1.1] font-bold tracking-tight text-balance">
+            Find the people, knowledge,
+            <br className="hidden sm:block" /> and <em>resources</em> you need.
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-[var(--fg-muted)] max-w-xl text-balance text-lg">
+            One search across every student, note set, and open request on
+            campus — ask for what you need in plain language.
           </p>
+          <SearchHero />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </section>
+
+      <section className="px-6 sm:px-8 pb-24 sm:pb-32">
+        <div className="mx-auto max-w-4xl grid grid-cols-3 divide-x divide-[var(--border)]">
+          {stats.map((s) => (
+            <div key={s.label} className="text-center px-2">
+              <div className="text-3xl sm:text-5xl font-bold tracking-tight">
+                {s.value}
+              </div>
+              <div className="text-xs sm:text-sm text-[var(--fg-muted)] mt-2 italic">
+                {s.label}
+              </div>
+            </div>
+          ))}
         </div>
-      </main>
+      </section>
+
+      <section className="px-6 sm:px-8 pb-24 sm:pb-32">
+        <div className="mx-auto max-w-5xl">
+          <div className="flex items-baseline justify-between mb-8">
+            <h2 className="text-2xl font-bold">Most helpful resources</h2>
+            <Link href="/resources" className="text-sm text-[var(--accent)] hover:underline">
+              Browse all →
+            </Link>
+          </div>
+          <div className="grid sm:grid-cols-2 2xl:grid-cols-3 gap-8">
+            {topResources.map((r) => (
+              <ResourceCard key={r._id} resource={r} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="px-6 sm:px-8 pb-32 sm:pb-40">
+        <div className="mx-auto max-w-5xl">
+          <div className="flex items-baseline justify-between mb-8">
+            <h2 className="text-2xl font-bold">Newest profiles</h2>
+            <Link href="/people" className="text-sm text-[var(--accent)] hover:underline">
+              Browse all →
+            </Link>
+          </div>
+          <div className="grid sm:grid-cols-2 2xl:grid-cols-3 gap-8">
+            {activePeople.map((p) => (
+              <PersonCard key={p._id} person={p} />
+            ))}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
